@@ -1722,6 +1722,115 @@ JNIEXPORT jint JNICALL Java_org_apache_mxnet_LibInfo_mxExecutorBindEX
   return ret;
 }
 
+JNIEXPORT jint JNICALL Java_org_apache_mxnet_LibInfo_mxExecutorReshape
+  (JNIEnv *env, jobject obj, jint partialShaping, jint allowUpSizing, jint deviceTypeId,
+    jint deviceID, jint numCtx, jobjectArray jctxMapKeys, jintArray jctxMapDevTypes,
+    jintArray jctxMapDevIDs, jint numProvidedArgShapes, jobjectArray jctxProvidedArgShapeNames,
+    jintArray jctxProvidedArgShapeData, jintArray jctxProvidedArgShapeIDs, jobject jnumArgs,
+    jobjectArray jargsHandle, jobjectArray jargsGradHandle, jobject jnumAuxArgs,
+    jobjectArray jauxArgsHandle, jlong jsharedExec, jobject jexecOut) {
+
+  mx_uint numArgs;
+  NDArrayHandle **argsHandle;
+  NDArrayHandle **argsGradHandle;
+  mx_uint numAuxStates;
+  NDArrayHandle **argsAuxHandle;
+  ExecutorHandle out;
+
+  ExecutorHandle sharedExec = nullptr;
+  if ((int32_t)jsharedExec != 0) sharedExec = reinterpret_cast<ExecutorHandle>(jsharedExec);
+
+  const char **mapKeys = new const char *[numCtx];
+  for (int i = 0; i < numCtx; i++) {
+      jstring jkey = reinterpret_cast<jstring>(env->GetObjectArrayElement(jctxMapKeys, i));
+      const char *key = env->GetStringUTFChars(jkey, 0);
+      mapKeys[i] = key;
+      env->DeleteLocalRef(jkey);
+  }
+
+  const char **providedArgShapeNames = new const char *[numProvidedArgShapes];
+  for (int i = 0; i < numCtx; i++) {
+      jstring jkey = reinterpret_cast<jstring>(env->GetObjectArrayElement(jctxProvidedArgShapeNames, i));
+      const char *key = env->GetStringUTFChars(jkey, 0);
+      providedArgShapeNames[i] = key;
+      env->DeleteLocalRef(jkey);
+  }
+
+  jint *mapDevTypes = env->GetIntArrayElements(jctxMapDevTypes, NULL);
+  jint *mapDevIDs = env->GetIntArrayElements(jctxMapDevIDs, NULL);
+  jint *providedArgShapeData = env->GetIntArrayElements(jctxProvidedArgShapeData, NULL);
+  jint *providedArgShapeIdx = env->GetIntArrayElements(jctxProvidedArgShapeIDs, NULL);
+
+  int ret = MXExecutorReshape(
+      partialShaping,
+      allowUpSizing,
+      deviceTypeId,
+      deviceID,
+      static_cast<mx_uint>(numCtx),
+      mapKeys,
+      mapDevTypes,
+      mapDevIDs,
+      static_cast<mx_uint>(numProvidedArgShapes),
+      providedArgShapeNames,
+      reinterpret_cast<mx_uint *>(providedArgShapeData),
+      reinterpret_cast<mx_uint *>(providedArgShapeIdx),
+      &numArgs,
+      argsHandle,
+      argsGradHandle,
+      &numAuxStates,
+      argsAuxHandle,
+      sharedExec,
+      &out);
+
+  env->ReleaseIntArrayElements(jctxProvidedArgShapeIDs, providedArgShapeIdx, 0);
+  env->ReleaseIntArrayElements(jctxProvidedArgShapeData, providedArgShapeData, 0);
+  env->ReleaseIntArrayElements(jctxMapDevIDs, mapDevIDs, 0);
+  env->ReleaseIntArrayElements(jctxMapDevTypes, mapDevTypes, 0);
+
+  for (int i = 0; i < numProvidedArgShapes; i++) {
+      jstring jkey = (jstring)env->GetObjectArrayElement(jctxProvidedArgShapeNames, i);
+      env->ReleaseStringUTFChars(jkey, providedArgShapeNames[i]);
+      env->DeleteLocalRef(jkey);
+  }
+  delete[] providedArgShapeNames;
+  for (int i = 0; i < numCtx; i++) {
+      jstring jkey = (jstring)env->GetObjectArrayElement(jctxMapKeys, i);
+      env->ReleaseStringUTFChars(jkey, mapKeys[i]);
+      env->DeleteLocalRef(jkey);
+  }
+  delete[] mapKeys;
+
+  jclass refIntClass = env->FindClass("org/apache/mxnet/Base$RefInt");
+  jfieldID value = env->GetFieldID(refIntClass, "value", "I");
+  env->SetIntField(jnumArgs, value, static_cast<jint>(numArgs));
+  env->SetIntField(jnumAuxArgs, value, static_cast<jint>(numAuxStates));
+
+  // fill handles
+  jclass longCls = env->FindClass("java/lang/Long");
+  jmethodID longConst = env->GetMethodID(longCls, "<init>", "(J)V");
+  jclass arrayClass = env->FindClass("scala/collection/mutable/ArrayBuffer");
+  jmethodID arrayAppend = env->GetMethodID(arrayClass,
+      "$plus$eq", "(Ljava/lang/Object;)Lscala/collection/mutable/ArrayBuffer;");
+  for (size_t i = 0; i < numArgs; ++i) {
+    jobject handle = env->NewObject(longCls, longConst, argsHandle[i]);
+    env->CallObjectMethod(jargsHandle, arrayAppend, handle);
+    env->DeleteLocalRef(handle);
+  }
+  for (size_t i = 0; i < numArgs; ++i) {
+    jobject handle = env->NewObject(longCls, longConst, argsGradHandle[i]);
+    env->CallObjectMethod(jargsGradHandle, arrayAppend, handle);
+    env->DeleteLocalRef(handle);
+  }
+  for (size_t i = 0; i < numAuxStates; ++i) {
+    jobject handle = env->NewObject(longCls, longConst, argsAuxHandle[i]);
+    env->CallObjectMethod(jauxArgsHandle, arrayAppend, handle);
+    env->DeleteLocalRef(handle);
+  }
+
+  SetLongField(env, jexecOut, reinterpret_cast<jlong>(out));
+  return ret;
+}
+
 JNIEXPORT jint JNICALL Java_org_apache_mxnet_LibInfo_mxRandomSeed
   (JNIEnv *env, jobject obj, jint seed) {
   return MXRandomSeed(seed);

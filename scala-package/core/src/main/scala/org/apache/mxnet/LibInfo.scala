@@ -272,6 +272,25 @@ private[mxnet] class LibInfo {
                               auxArgsHandle: Array[NDArrayHandle],
                               sharedExec: ExecutorHandle,
                               out: ExecutorHandleRef): Int
+  @native def mxExecutorReshape(partialShaping: Int,
+                                allowUpSizing: Int,
+                                deviceTypeId: Int,
+                                deviceID: Int,
+                                numCtx: Int,
+                                ctxMapKeys: Array[String],
+                                ctxMapDevTypes: Array[Int],
+                                ctxMapDevIDs: Array[Int],
+                                numProvidedArgShapes: Int,
+                                providedArgShapeNames: Array[String],
+                                providedArgShapeData: Array[Int],
+                                providedArgShapeIdx: Array[Int],
+                                numArgs: MXUintRef,
+                                argsHandle: Array[NDArrayHandleRef],
+                                argsGradHandle: Array[NDArrayHandleRef],
+                                numAuxArgs: MXUintRef,
+                                auxArgsHandle: Array[NDArrayHandleRef],
+                                sharedExec: ExecutorHandle,
+                                out: ExecutorHandleRef): Int
   // scalastyle:on parameterNum
   @native def mxSymbolSaveToFile(handle: SymbolHandle, fname: String): Int
   @native def mxSymbolCreateFromFile(fname: String, handle: SymbolHandleRef): Int
